@@ -1,5 +1,5 @@
 #include "commit.cpp"
-
+#include <set>
 /*
 .shit
     HEAD <- id текущего коммита
@@ -8,7 +8,7 @@
         ...
     objects <- сжатые версии файлов
         ...
-    versions <- 
+    versions <-
         ...
     commits <- сборник бинарников коммитов
         ...
@@ -31,7 +31,7 @@ void vcshit_init(const std::string &dir)
         return;
     }
 
-    fs::create_directories(versions_dir);
+    // fs::create_directories(versions_dir);
     fs::create_directories(objects_dir);
     fs::create_directories(commits_dir);
     fs::create_directories(diffs_dir);
@@ -201,7 +201,7 @@ void vcshit_revert(const std::string &version)
 
     Commit target;
     target.deserialize(commits_dir / (version + ".bin"));
-     for (auto &f : target.tracked_files)
+    for (auto &f : target.tracked_files)
     {
         fs::path dest_path = current_path / f.path;
         fs::create_directories(dest_path.parent_path());
@@ -285,6 +285,89 @@ bool inline vcshit_compress(const char *src, const char *dest)
     return compress_file(src, dest);
 }
 
+void vcshit_status()
+{
+    auto all_files = std::set<fs::path>();
+    for (auto &entry : fs::recursive_directory_iterator(current_path))
+    {
+        if (fs::is_directory(entry.path()))
+        {
+            continue;
+        }
+        if (entry.path().string().find(".shit") != std::string::npos)
+        {
+            continue;
+        }
+        all_files.emplace(entry.path());
+    }
+    auto t_v = get_tracked_files();
+    std::set<fs::path> tracked_files = std::set<fs::path>();
+    for (auto &f : t_v)
+        tracked_files.emplace(f);
+
+    std::vector<fs::path> deleted;
+    std::vector<fs::path> added;
+    std::vector<fs::path> modified;
+    Commit latest;
+    latest.deserialize(commits_dir / (get_current_commit_id() + ".bin"));
+
+    for (auto &i : all_files)
+    {
+        if (!tracked_files.count(i))
+        {
+            added.push_back(i);
+            continue;
+        }
+        for (auto &file : latest.tracked_files)
+        {
+            if (file.path == i && file.hash != xxhash_file(i))
+            {
+
+                modified.push_back(i);
+                break;
+            }
+        }
+    }
+    for (auto &i : tracked_files)
+    {
+        if (!all_files.count(i))
+        {
+            deleted.push_back(i);
+        }
+    }
+    /* Вывести предложения в консоль */
+    if (added.size() > 0)
+    {
+        std::cout << "Found " << added.size() << " new files. Run command below to add them to index:\n";
+        std::cout << "shit add ";
+        for (auto &i : added)
+        {
+            std::cout << "  " << ANSI_RED << fs::relative(i, current_path) << ANSI_RESET << '\n';
+        }
+        std::cout << std::endl;
+    }
+    if (deleted.size() > 0)
+    {
+        std::cout << "Found " << deleted.size() << " files was deleted. Run command below to delete them from index:\n";
+        std::cout << "shit delete ";
+        for (auto &i : deleted)
+        {
+            std::cout << "  " << ANSI_RED << fs::relative(i, current_path) << ANSI_RESET << '\n';
+        }
+        std::cout << std::endl;
+    }
+    if (modified.size() > 0)
+    {
+        std::cout << "Found " << modified.size() << " modified files.\n";
+        std::cout << "(run \"shit commit <author> <message>\" to apply changes)\n";
+        std::cout << "NOT_YET_IMPLEMENTED (run \"shit restore <filename>\" to discard changes)\n";
+        for (auto &i : modified)
+        {
+            std::cout << "  " << ANSI_RED << fs::relative(i, current_path) << ANSI_RESET << '\n';
+        }
+        std::cout << std::endl;
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -346,15 +429,6 @@ int main(int argc, char *argv[])
             }
             std::cerr << "Need to specify <src> and <dest> files";
         }
-        if (arg1 == "comvers")
-        {
-            if (argc > 2)
-            {
-                vcshit_compress_version(std::string(argv[2]));
-                return 0;
-            }
-            std::cerr << "Need to specify version name";
-        }
         if (arg1 == "log")
         {
             if (argc > 2)
@@ -368,7 +442,10 @@ int main(int argc, char *argv[])
         {
             if (argc > 2)
             {
+#ifdef _WIN32
                 enable_vt_mode();
+#endif
+
                 print_diff_colored(read_diff((diffs_dir / (std::string(argv[2]) + ".diff")).string()));
                 return 0;
             }
