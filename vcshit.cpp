@@ -1,5 +1,6 @@
 #include "commit.cpp"
 #include <set>
+
 /*
 .shit
     HEAD <- id текущего коммита
@@ -298,7 +299,7 @@ void vcshit_status()
         {
             continue;
         }
-        all_files.emplace(entry.path());
+        all_files.emplace(fs::relative(entry.path(), current_path));
     }
     auto t_v = get_tracked_files();
     std::set<fs::path> tracked_files = std::set<fs::path>();
@@ -313,33 +314,34 @@ void vcshit_status()
 
     for (auto &i : all_files)
     {
-        if (!tracked_files.count(i))
+        if (tracked_files.count(fs::relative(i, current_path)) == 0)
         {
             added.push_back(i);
             continue;
         }
         for (auto &file : latest.tracked_files)
         {
-            if (file.path == i && file.hash != xxhash_file(i))
+            if (file.path == fs::relative(i, current_path) && file.hash != xxhash_file(i))
             {
 
-                modified.push_back(i);
+                modified.push_back(fs::relative(i, current_path));
                 break;
             }
         }
     }
     for (auto &i : tracked_files)
     {
-        if (!all_files.count(i))
+        if (all_files.count(fs::relative(i, current_path)) == 0)
         {
-            deleted.push_back(i);
+            deleted.push_back(fs::relative(i, current_path));
         }
     }
+
     /* Вывести предложения в консоль */
     if (added.size() > 0)
     {
         std::cout << "Found " << added.size() << " new files. Run command below to add them to index:\n";
-        std::cout << "shit add ";
+        std::cout << "shit add <file>\n";
         for (auto &i : added)
         {
             std::cout << "  " << ANSI_RED << fs::relative(i, current_path) << ANSI_RESET << '\n';
@@ -349,7 +351,7 @@ void vcshit_status()
     if (deleted.size() > 0)
     {
         std::cout << "Found " << deleted.size() << " files was deleted. Run command below to delete them from index:\n";
-        std::cout << "shit delete ";
+        std::cout << "shit delete <file>\n";
         for (auto &i : deleted)
         {
             std::cout << "  " << ANSI_RED << fs::relative(i, current_path) << ANSI_RESET << '\n';
@@ -371,6 +373,10 @@ void vcshit_status()
 
 int main(int argc, char *argv[])
 {
+#ifdef _WIN32
+    enable_vt_mode();
+#endif
+
     if (argc > 1)
     {
         std::string arg1 = std::string(argv[1]);
@@ -442,14 +448,15 @@ int main(int argc, char *argv[])
         {
             if (argc > 2)
             {
-#ifdef _WIN32
-                enable_vt_mode();
-#endif
-
                 print_diff_colored(read_diff((diffs_dir / (std::string(argv[2]) + ".diff")).string()));
                 return 0;
             }
             std::cerr << "Need to specify diff id";
+        }
+        if (arg1 == "status")
+        {
+            vcshit_status();
+            return 0;
         }
         if (arg1 == "-h")
         {
