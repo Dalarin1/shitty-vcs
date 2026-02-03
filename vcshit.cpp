@@ -131,49 +131,6 @@ inline void vcshit_print_commit(const std::string &id)
     commit.deserialize(commits_dir / (id + ".bin"));
     commit.print();
 }
-/// @brief TODO DELETE
-/// @param version
-void vcshit_compress_version(const std::string &version)
-{
-    fs::path version_folder = versions_dir / version;
-    fs::create_directories(version_folder);
-
-    std::string buffer = "";
-    std::ifstream index = std::ifstream(index_file);
-    size_t temp;
-    fs::path from;
-
-    while (std::getline(index, buffer))
-    {
-        std::cout << buffer << '\n';
-        temp = buffer.find_last_not_of(" \t\r\n");
-        if (temp == std::string::npos)
-        {
-            std::cerr << "Error: found wrong file name inside index: " << buffer << std::endl;
-            continue;
-        }
-        buffer.erase(temp + 1);
-        from = current_path / buffer;
-        // считаем хэш файла
-        std::string fhash = xxhash_file(from);
-        std::cout << "Hash for " << buffer << " is " << fhash << '\n';
-        fs::path compressed_file_path = (objects_dir / fhash);
-        std::cout << "Compressing " << from << " to " << compressed_file_path << '\n';
-        // если путь до compressed_file_path не существует, значит сжатый файл еще не существует
-        // если же путь есть, то файл с данным хэшэм уже есть -> данные те же -> записывать не надо
-        if (!fs::exists(compressed_file_path))
-        {
-            // при ошибке функция сама пишет в cerr
-            compress_file(from, objects_dir / fhash);
-        }
-        else
-        {
-            std::cerr << "Compressed file " << compressed_file_path << "already exists\n";
-        }
-    }
-    std::cerr << std::endl;
-    std::cout << std::endl;
-}
 
 // TODO
 // Добавить валидацию версии (чтобы не удалить файлы, которые удалять не надо)
