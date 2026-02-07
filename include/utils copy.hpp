@@ -261,9 +261,10 @@ std::string xxhash_file(const fs::path &src)
     return oss.str();
 }
 
-std::string xxhash_bytes(const char* bytes, size_t len)
+std::string xxhash_bytes(const char *bytes, size_t len)
 {
-    if(len == 0){
+    if (len == 0)
+    {
         std::cerr << "Cant hash empty sequence! " << std::endl;
         return "";
     }
@@ -294,19 +295,73 @@ std::string xxhash_bytes(const char* bytes, size_t len)
     return oss.str();
 }
 
-inline void write_string(const std::string& str, std::ofstream& file){
+inline bool write_string_to_file(const std::string &str, std::ofstream &file)
+{
     size_t len = str.size();
-    file.write(reinterpret_cast<char*>(&len), sizeof(size_t));
+    file.write(reinterpret_cast<char *>(&len), sizeof(size_t));
     file.write(str.data(), len);
+
+    return ! file.fail();
 }
-inline void read_string(std::string& str, std::ifstream& file){
+inline bool read_string_from_file(std::string &str, std::ifstream &file)
+{
     size_t len;
-    file.read(reinterpret_cast<char*>(&len), sizeof(size_t));
+    file.read(reinterpret_cast<char *>(&len), sizeof(size_t));
     str.resize(len);
     file.read(str.data(), len);
+
+    return ! file.fail();
 }
 
-template<typename T>
-inline void read(T& var, std::ifstream& file){
-    file.read(reinterpret_cast<char*>(var), sizeof(T));
+
+template <typename T, typename ElemWriter>
+bool write_vector_to_file(const std::vector<T> &vec, std::ofstream &file, ElemWriter write_elem)
+{
+    static_assert(
+        std::is_same_v<decltype(write_elem(std::declval<const T &>(),
+                                           std::declval<std::ofstream &>())),
+                       bool>,
+        "ElemWriter must return bool");
+
+    size_t size = vec.size();
+    file.write(reinterpret_cast<char *>(&size), sizeof(size_t));
+
+    if (file.fail())
+    {
+        return false;
+    }
+    for (auto &i : vec)
+    {
+        if (!write_elem(i, file))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+template <typename T, typename ElemReader>
+bool read_vector_from_file(std::vector<T> &vec, std::ifstream &file, ElemReader read_elem)
+{
+    static_assert(
+        std::is_same_v<decltype(read_elem(std::declval<T &>(),
+                                          std::declval<std::ifstream &>())),
+                       bool>,
+        "ElemWriter must return bool");
+    size_t size = 0;
+    file.read(reinterpret_cast<char *>(&size), sizeof(size_t));
+    vec.resize(size);
+    if (file.fail())
+    {
+        return false;
+    }
+    for (auto &i : vec)
+    {
+        if (!read_elem(i, file))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
