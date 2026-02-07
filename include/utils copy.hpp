@@ -270,7 +270,7 @@ inline bool write_string_to_file(const std::string &str, std::ofstream &file) {
 inline bool read_string_from_file(std::string &str, std::ifstream &file) {
     size_t len;
     file.read(reinterpret_cast<char *>(&len), sizeof(size_t));
-    if(len > str.max_size()){
+    if (len > str.max_size()) {
         return false;
     }
     str.resize(len);
@@ -304,10 +304,10 @@ bool write_vector_to_file(const std::vector<T> &vec, std::ofstream &file,
 template <typename T, typename ElemReader>
 bool read_vector_from_file(std::vector<T> &vec, std::ifstream &file,
                            ElemReader read_elem) {
-    auto reader_return_type =
-        decltype(read_elem(std::declval<T &>(), std::declval<std::ifstream &>()));
 
-    static_assert(std::is_same_v<reader_return_type, bool>,
+    static_assert(std::is_same_v<decltype(read_elem(std::declval<T &>(),
+                                                    std::declval<std::ifstream &>())),
+                                 bool>,
                   "ElemReader must return bool");
 
     size_t size = 0;
