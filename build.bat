@@ -10,12 +10,13 @@ if "%~1"=="" (
         -Wall ^
         -I include ^
         -I include\zlib ^
-        -O2 ^
+        -O0 ^
         -std=c++17 ^
         -L include\zlib ^
         -lzlib1 ^
         vcshit.cpp ^
-        -o main.exe
+        -o main.exe ^
+        -g
 ) else (
     call g++.exe ^
         -Wall ^
