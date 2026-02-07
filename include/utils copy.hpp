@@ -1,16 +1,15 @@
-#include <vector>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 #include <xxhash.c>
 #include <zlib.h>
 
 #define CHUNK_SIZE 4096
 namespace fs = std::filesystem;
 
-bool compress_file(const fs::path &src, const fs::path &dest)
-{
+bool compress_file(const fs::path &src, const fs::path &dest) {
     uint8_t inbuff[CHUNK_SIZE];
     uint8_t outbuff[CHUNK_SIZE];
     z_stream stream = {0};
@@ -18,25 +17,21 @@ bool compress_file(const fs::path &src, const fs::path &dest)
     std::ifstream src_file(src, std::ios::binary);
     std::ofstream dest_file(dest, std::ios::binary);
 
-    if (!src_file.is_open() || !dest_file.is_open())
-    {
+    if (!src_file.is_open() || !dest_file.is_open()) {
         std::cerr << "Failed to open files!\n";
         return false;
     }
 
-    if (deflateInit(&stream, Z_BEST_COMPRESSION) != Z_OK)
-    {
+    if (deflateInit(&stream, Z_BEST_COMPRESSION) != Z_OK) {
         std::cerr << "deflateInit(...) failed!\n";
         return false;
     }
 
     int flush;
-    do
-    {
+    do {
         src_file.read(reinterpret_cast<char *>(inbuff), CHUNK_SIZE);
 
-        if (src_file.bad())
-        {
+        if (src_file.bad()) {
             std::cerr << "ifstream.read(...) failed!\n";
             deflateEnd(&stream);
             return false;
@@ -46,13 +41,11 @@ bool compress_file(const fs::path &src, const fs::path &dest)
         stream.next_in = inbuff;
         flush = src_file.eof() ? Z_FINISH : Z_NO_FLUSH;
 
-        do
-        {
+        do {
             stream.avail_out = CHUNK_SIZE;
             stream.next_out = outbuff;
 
-            if (deflate(&stream, flush) == Z_STREAM_ERROR)
-            {
+            if (deflate(&stream, flush) == Z_STREAM_ERROR) {
                 std::cerr << "deflate error!\n";
                 deflateEnd(&stream);
                 return false;
@@ -61,8 +54,7 @@ bool compress_file(const fs::path &src, const fs::path &dest)
             uint32_t nbytes = CHUNK_SIZE - stream.avail_out;
             dest_file.write(reinterpret_cast<char *>(outbuff), nbytes);
 
-            if (dest_file.bad())
-            {
+            if (dest_file.bad()) {
                 std::cerr << "ofstream.write(...) failed!\n";
                 deflateEnd(&stream);
                 return false;
@@ -73,17 +65,14 @@ bool compress_file(const fs::path &src, const fs::path &dest)
     return deflateEnd(&stream) == Z_OK;
 }
 
-inline bool compress_file(const std::string &src, const std::string &dest)
-{
+inline bool compress_file(const std::string &src, const std::string &dest) {
     return compress_file(fs::path(src), fs::path(dest));
 }
-inline bool compress_file(const char *src, const char *dest)
-{
+inline bool compress_file(const char *src, const char *dest) {
     return compress_file(fs::path(src), fs::path(dest));
 }
 
-bool decompress_file(const fs::path &src, const fs::path &dest)
-{
+bool decompress_file(const fs::path &src, const fs::path &dest) {
     uint8_t inbuff[CHUNK_SIZE];
     uint8_t outbuff[CHUNK_SIZE];
 
@@ -92,24 +81,20 @@ bool decompress_file(const fs::path &src, const fs::path &dest)
     std::ifstream src_file = std::ifstream(src, std::ios::binary);
     std::ofstream dest_file = std::ofstream(dest, std::ios::binary);
 
-    if (!src_file.is_open() || !dest_file.is_open())
-    {
+    if (!src_file.is_open() || !dest_file.is_open()) {
         std::cerr << "Failed to open files!\n";
         return false;
     }
 
-    if (inflateInit(&stream) != Z_OK)
-    {
+    if (inflateInit(&stream) != Z_OK) {
         std::cerr << "inflateInit failed!\n";
         return false;
     }
 
     int ret;
-    do
-    {
+    do {
         src_file.read(reinterpret_cast<char *>(inbuff), CHUNK_SIZE);
-        if (src_file.bad())
-        {
+        if (src_file.bad()) {
             std::cerr << "ifstream.read(...) error!\n";
             inflateEnd(&stream);
             return false;
@@ -117,46 +102,41 @@ bool decompress_file(const fs::path &src, const fs::path &dest)
         stream.avail_in = src_file.gcount();
         stream.next_in = inbuff;
 
-        do
-        {
+        do {
             stream.avail_out = CHUNK_SIZE;
             stream.next_out = outbuff;
             ret = inflate(&stream, Z_NO_FLUSH);
-            if (ret != Z_OK && ret != Z_STREAM_END)
-            {
+            if (ret != Z_OK && ret != Z_STREAM_END) {
                 std::cerr << "inflate failed with " << ret << std::endl;
                 inflateEnd(&stream);
                 return false;
             }
-            dest_file.write(reinterpret_cast<char *>(outbuff), CHUNK_SIZE - stream.avail_out);
+            dest_file.write(reinterpret_cast<char *>(outbuff),
+                            CHUNK_SIZE - stream.avail_out);
         } while (stream.avail_out == 0);
 
     } while (ret != Z_STREAM_END);
     inflateEnd(&stream);
     return true;
 }
-inline bool decompress_file(const std::string &src, const std::string &dest)
-{
+inline bool decompress_file(const std::string &src, const std::string &dest) {
     return decompress_file(fs::path(src), fs::path(dest));
 }
-inline bool decompress_file(const char *src, const char *dest)
-{
+inline bool decompress_file(const char *src, const char *dest) {
     return decompress_file(fs::path(src), fs::path(dest));
 }
 
-bool compress_dir(const fs::path &src_dir, const fs::path &dest_dir)
-{
-    if (!fs::exists(src_dir) || !fs::is_directory(src_dir))
-    {
-        std::cerr << "Given src_dir does not exist or is not a directory: " << src_dir << std::endl;
+bool compress_dir(const fs::path &src_dir, const fs::path &dest_dir) {
+    if (!fs::exists(src_dir) || !fs::is_directory(src_dir)) {
+        std::cerr << "Given src_dir does not exist or is not a directory: " << src_dir
+                  << std::endl;
         return false;
     }
 
     // Ensure destination directory exists
     fs::create_directories(dest_dir);
 
-    for (auto &iter : fs::recursive_directory_iterator(src_dir))
-    {
+    for (auto &iter : fs::recursive_directory_iterator(src_dir)) {
         if (iter.is_directory())
             continue;
 
@@ -166,8 +146,7 @@ bool compress_dir(const fs::path &src_dir, const fs::path &dest_dir)
 
         fs::create_directories(out_path.parent_path());
 
-        if (!compress_file(iter.path(), out_path))
-        {
+        if (!compress_file(iter.path(), out_path)) {
             std::cerr << "Failed to compress file:\n"
                       << "  Source: " << iter.path() << "\n"
                       << "  Destination: " << out_path << std::endl;
@@ -178,18 +157,16 @@ bool compress_dir(const fs::path &src_dir, const fs::path &dest_dir)
     return true;
 }
 
-bool decompress_dir(const fs::path &src_dir, const fs::path &dest_dir)
-{
-    if (!fs::exists(src_dir) || !fs::is_directory(src_dir))
-    {
-        std::cerr << "Given src_dir does not exist or is not a directory: " << src_dir << std::endl;
+bool decompress_dir(const fs::path &src_dir, const fs::path &dest_dir) {
+    if (!fs::exists(src_dir) || !fs::is_directory(src_dir)) {
+        std::cerr << "Given src_dir does not exist or is not a directory: " << src_dir
+                  << std::endl;
         return false;
     }
 
     fs::create_directories(dest_dir);
 
-    for (auto &iter : fs::recursive_directory_iterator(src_dir))
-    {
+    for (auto &iter : fs::recursive_directory_iterator(src_dir)) {
         if (iter.is_directory())
             continue;
 
@@ -201,8 +178,7 @@ bool decompress_dir(const fs::path &src_dir, const fs::path &dest_dir)
 
         fs::create_directories(out_path.parent_path());
 
-        if (!decompress_file(iter.path(), out_path))
-        {
+        if (!decompress_file(iter.path(), out_path)) {
             std::cerr << "Failed to decompress file:\n"
                       << "  Source: " << iter.path() << "\n"
                       << "  Destination: " << out_path << std::endl;
@@ -213,32 +189,27 @@ bool decompress_dir(const fs::path &src_dir, const fs::path &dest_dir)
     return true;
 }
 
-std::string xxhash_file(const fs::path &src)
-{
+std::string xxhash_file(const fs::path &src) {
     std::ifstream src_file(src, std::ios::binary);
-    if (!src_file)
-    {
+    if (!src_file) {
         std::cerr << "Fail while opening " << src << std::endl;
         return "";
     }
 
     XXH3_state_t *state = XXH3_createState();
-    if (!state)
-    {
+    if (!state) {
         std::cerr << "Error while creating XXH3_state_t!" << std::endl;
         return "";
     }
 
-    if (XXH3_128bits_reset(state) != XXH_OK)
-    {
+    if (XXH3_128bits_reset(state) != XXH_OK) {
         std::cerr << "Error while resetting hash state!" << std::endl;
         XXH3_freeState(state);
         return "";
     }
 
     uint8_t buffer[CHUNK_SIZE];
-    while (true)
-    {
+    while (true) {
         src_file.read(reinterpret_cast<char *>(buffer), CHUNK_SIZE);
         std::streamsize read_count = src_file.gcount();
         if (read_count <= 0)
@@ -254,29 +225,24 @@ std::string xxhash_file(const fs::path &src)
     XXH3_freeState(state);
 
     std::ostringstream oss;
-    oss << std::hex << std::setfill('0')
-        << std::setw(16) << hash.high64
-        << std::setw(16) << hash.low64;
+    oss << std::hex << std::setfill('0') << std::setw(16) << hash.high64 << std::setw(16)
+        << hash.low64;
 
     return oss.str();
 }
 
-std::string xxhash_bytes(const char *bytes, size_t len)
-{
-    if (len == 0)
-    {
+std::string xxhash_bytes(const char *bytes, size_t len) {
+    if (len == 0) {
         std::cerr << "Cant hash empty sequence! " << std::endl;
         return "";
     }
     XXH3_state_t *state = XXH3_createState();
-    if (!state)
-    {
+    if (!state) {
         std::cerr << "Error while creating XXH3_state_t!" << std::endl;
         XXH3_freeState(state);
         return "";
     }
-    if (XXH3_128bits_reset(state) != XXH_OK)
-    {
+    if (XXH3_128bits_reset(state) != XXH_OK) {
         std::cerr << "Error while reset hash state!" << std::endl;
         XXH3_freeState(state);
         return "";
@@ -289,51 +255,46 @@ std::string xxhash_bytes(const char *bytes, size_t len)
     XXH3_freeState(state);
 
     std::ostringstream oss;
-    oss << std::hex << std::setfill('0')
-        << std::setw(16) << hash.high64
-        << std::setw(16) << hash.low64;
+    oss << std::hex << std::setfill('0') << std::setw(16) << hash.high64 << std::setw(16)
+        << hash.low64;
     return oss.str();
 }
 
-inline bool write_string_to_file(const std::string &str, std::ofstream &file)
-{
+inline bool write_string_to_file(const std::string &str, std::ofstream &file) {
     size_t len = str.size();
     file.write(reinterpret_cast<char *>(&len), sizeof(size_t));
     file.write(str.data(), len);
 
-    return ! file.fail();
+    return !file.fail();
 }
-inline bool read_string_from_file(std::string &str, std::ifstream &file)
-{
+inline bool read_string_from_file(std::string &str, std::ifstream &file) {
     size_t len;
     file.read(reinterpret_cast<char *>(&len), sizeof(size_t));
+    if(len > str.max_size()){
+        return false;
+    }
     str.resize(len);
     file.read(str.data(), len);
 
-    return ! file.fail();
+    return !file.fail();
 }
 
-
 template <typename T, typename ElemWriter>
-bool write_vector_to_file(const std::vector<T> &vec, std::ofstream &file, ElemWriter write_elem)
-{
-    static_assert(
-        std::is_same_v<decltype(write_elem(std::declval<const T &>(),
-                                           std::declval<std::ofstream &>())),
-                       bool>,
-        "ElemWriter must return bool");
+bool write_vector_to_file(const std::vector<T> &vec, std::ofstream &file,
+                          ElemWriter write_elem) {
+    static_assert(std::is_same_v<decltype(write_elem(std::declval<const T &>(),
+                                                     std::declval<std::ofstream &>())),
+                                 bool>,
+                  "ElemWriter must return bool");
 
     size_t size = vec.size();
     file.write(reinterpret_cast<char *>(&size), sizeof(size_t));
 
-    if (file.fail())
-    {
+    if (file.fail()) {
         return false;
     }
-    for (auto &i : vec)
-    {
-        if (!write_elem(i, file))
-        {
+    for (auto &i : vec) {
+        if (!write_elem(i, file)) {
             return false;
         }
     }
@@ -341,24 +302,27 @@ bool write_vector_to_file(const std::vector<T> &vec, std::ofstream &file, ElemWr
 }
 
 template <typename T, typename ElemReader>
-bool read_vector_from_file(std::vector<T> &vec, std::ifstream &file, ElemReader read_elem)
-{
-    static_assert(
-        std::is_same_v<decltype(read_elem(std::declval<T &>(),
-                                          std::declval<std::ifstream &>())),
-                       bool>,
-        "ElemWriter must return bool");
+bool read_vector_from_file(std::vector<T> &vec, std::ifstream &file,
+                           ElemReader read_elem) {
+    auto reader_return_type =
+        decltype(read_elem(std::declval<T &>(), std::declval<std::ifstream &>()));
+
+    static_assert(std::is_same_v<reader_return_type, bool>,
+                  "ElemReader must return bool");
+
     size_t size = 0;
     file.read(reinterpret_cast<char *>(&size), sizeof(size_t));
-    vec.resize(size);
-    if (file.fail())
-    {
+
+    if (size > vec.max_size()) {
         return false;
     }
-    for (auto &i : vec)
-    {
-        if (!read_elem(i, file))
-        {
+    vec.resize(size);
+
+    if (file.fail()) {
+        return false;
+    }
+    for (auto &i : vec) {
+        if (!read_elem(i, file)) {
             return false;
         }
     }
